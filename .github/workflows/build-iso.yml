@@ -76,5 +76,5 @@ jobs:
     - name: Disponibilizar ISO para Download
       uses: actions/upload-artifact@v4
       with:
-        name: distro-linux-iso
-        path: meu-sistema-64bit.iso
+        name: Carlinho-Linux-iso
+        path: Carlinho-Linux.iso
