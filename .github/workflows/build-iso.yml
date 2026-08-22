@@ -77,4 +77,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: Carlinho-Linux-iso
-        path: Carlinho-Linux.iso
+        path: meu-sistema-64bit.iso
