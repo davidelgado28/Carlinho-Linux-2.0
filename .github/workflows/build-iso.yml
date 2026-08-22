@@ -50,28 +50,32 @@ jobs:
         git clone https://github.com/limine-bootloader/limine.git --branch=v7.x-binary --depth=1
         make -C limine
         
-        mkdir -p iso_root
+        mkdir -p iso_root/boot iso_root/limine
         cp build/vmlinuz iso_root/
         cp build/initramfs.img iso_root/
         cp limine/limine-bios.sys limine/limine-bios-cd.bin limine/limine-uefi-cd.bin iso_root/
         
-        # Cria a configuração do Limine
+        # Cria a configuração do Limine principal
         cat <<EOF > iso_root/limine.conf
         timeout: 3
-        /Meu SO Linux (64-bit)
+        /Carlinho-Linux (64-bit)
             protocol: linux
             kernel_path: boot:///vmlinuz
             initrd_path: boot:///initramfs.img
         EOF
+        
+        # Copia a configuração para as outras pastas de busca do Limine
+        cp iso_root/limine.conf iso_root/boot/limine.conf
+        cp iso_root/limine.conf iso_root/limine/limine.conf
 
-        # Gera a ISO Híbrida (UEFI + BIOS)
+        # Gera a ISO Híbrida
         xorriso -as mkisofs -b limine-bios-cd.bin \
           -no-emul-boot -boot-load-size 4 -boot-info-table \
           --efi-boot limine-uefi-cd.bin \
           -efi-boot-part --efi-boot-image --protective-msdos-label \
-          iso_root -o meu-sistema-64bit.iso
+          iso_root -o Carlinho-Linux.iso
 
-        ./limine/limine bios-install meu-sistema-64bit.iso
+        ./limine/limine bios-install Carlinho-Linux.iso
 
     - name: Disponibilizar ISO para Download
       uses: actions/upload-artifact@v4
