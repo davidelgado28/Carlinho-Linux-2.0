@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Define o papel de parede usando o swaybg
+# Define o papel de parede 
 swaybg -i /usr/share/backgrounds/wallpaper.jpg -m fill &
 
 # Abre o terminal padrão na inicialização para testes
