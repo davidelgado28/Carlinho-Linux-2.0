@@ -1,1 +1,17 @@
+#!/bin/sh
+echo "Configurando a interface de rede..."
 
+# Ativa o loopback local
+ip link set lo up
+
+# Tenta encontrar a primeira placa Ethernet disponível (ex: eth0, enp3s0)
+INTERFACE=$(ip -o link show | awk -F': ' '$2 != "lo" {print $2; exit}')
+
+if [ -n "$INTERFACE" ]; then
+    echo "Placa de rede encontrada: $INTERFACE"
+    ip link set $INTERFACE up
+    # Pega IP automaticamente via DHCP do roteador
+    udhcpc -i $INTERFACE -s /etc/udhcpc/default.script &
+else
+    echo "Nenhuma interface de rede encontrada."
+fi
