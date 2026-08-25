@@ -1,13 +1,71 @@
-- name: Gerar Imagem ISO com Limine
+name: Compilar ISO Linux x86_64
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Baixar Código do Repositório
+      uses: actions/checkout@v4
+
+    - name: Instalar Ferramentas de Compilação
       run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential bc bison flex libssl-dev libelf-dev xorriso mtools cpio git wget
+
+    - name: Baixar e Compilar Kernel Linux (x86_64)
+      run: |
+        set -e
+        KERNEL_VERSION="6.6.21"
+        echo "Baixando o Kernel $KERNEL_VERSION..."
+        wget -q https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VERSION}.tar.xz
+        tar -xf linux-${KERNEL_VERSION}.tar.xz
+        cd linux-${KERNEL_VERSION}
+        
+        cp ../config/kernel.config .config
+        make olddefconfig
+        echo "Compilando o Kernel (isso pode levar alguns minutos)..."
+        make -j$(nproc) bzImage
+        
+        mkdir -p ../build
+        cp arch/x86/boot/bzImage ../build/vmlinuz
+        echo "Kernel compilado com sucesso:"
+        ls -lh ../build/vmlinuz
+
+    - name: Montar RootFS
+      run: |
+        set -e
+        chmod +x scripts/*.sh
+        ./scripts/build_rootfs.sh
+
+    - name: Compactar Initramfs
+      run: |
+        set -e
+        cd build/rootfs
+        echo "Compactando o sistema de arquivos"
+        find . -print0 | cpio --null -ov --format=newc | gzip -9 > ../initramfs.img
+        cd ../..
+        echo "Initramfs gerado com sucesso:"
+        ls -lh build/initramfs.img
+
+    - name: Gerar Imagem ISO com Limine
+      run: |
+        set -e
         git clone https://github.com/limine-bootloader/limine.git --branch=v7.x-binary --depth=1
         make -C limine
         
         mkdir -p iso_root/boot iso_root/limine
-        
-        cp build/vmlinuz iso_root/ || echo "ERRO: vmlinuz não encontrado!"
-        cp build/initramfs.img iso_root/ || echo "ERRO: initramfs.img não encontrado!"
-        
+
+        cp build/vmlinuz iso_root/
+        cp build/initramfs.img iso_root/
         cp limine/limine-bios.sys limine/limine-bios-cd.bin limine/limine-uefi-cd.bin iso_root/
         
         echo "=== CONTEÚDO DA PASTA ISO_ROOT ==="
@@ -32,5 +90,11 @@
 
         ./limine/limine bios-install Carlinho-Linux.iso
         
-        # Mostra o tamanho final da ISO gerada
+        echo "ISO gerada com sucesso:"
         ls -lh Carlinho-Linux.iso
+
+    - name: Disponibilizar ISO para Download
+      uses: actions/upload-artifact@v4
+      with:
+        name: Carlinho-Linux
+        path: Carlinho-Linux.iso
