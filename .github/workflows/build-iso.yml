@@ -55,15 +55,15 @@ jobs:
         cd ../../..
 
         cat << 'EOF' > build/rootfs/init
-#!/bin/sh
-mount -t proc none /proc
-mount -t sysfs none /sys
-clear
-echo "========================================"
-echo "   BEM-VINDO AO CARLINHO-LINUX (v1.0)   "
-echo "========================================"
-exec /bin/sh
-EOF
+        #!/bin/sh
+        mount -t proc none /proc
+        mount -t sysfs none /sys
+        clear
+        echo "========================================"
+        echo "   BEM-VINDO AO CARLINHO-LINUX (v1.0)   "
+        echo "========================================"
+        exec /bin/sh
+        EOF
         chmod +x build/rootfs/init
 
     - name: Compactar Initramfs
