@@ -79,22 +79,29 @@ jobs:
         git clone https://github.com/limine-bootloader/limine.git --branch=v7.x-binary --depth=1
         make -C limine
         
+        # Limpa e cria a estrutura do zero
         rm -rf iso_root
         mkdir -p iso_root/boot iso_root/limine
         
+        # Copia o Kernel e o Initramfs
         cp build/vmlinuz iso_root/boot/vmlinuz
         cp build/initramfs.img iso_root/boot/initramfs.img
+        
+        # Copia os binários do Limine
         cp limine/limine-bios.sys limine/limine-bios-cd.bin limine/limine-uefi-cd.bin iso_root/
         
+        # Cria o limine.conf com a sintaxe corrigida (boot():)
         echo "timeout: 3" > iso_root/limine.conf
+        echo "" >> iso_root/limine.conf
         echo "/Carlinho-Linux (64-bit)" >> iso_root/limine.conf
         echo "    protocol: linux" >> iso_root/limine.conf
-        echo "    kernel_path: boot:///boot/vmlinuz" >> iso_root/limine.conf
-        echo "    initrd_path: boot:///boot/initramfs.img" >> iso_root/limine.conf
+        echo "    kernel_path: boot():/boot/vmlinuz" >> iso_root/limine.conf
+        echo "    initrd_path: boot():/boot/initramfs.img" >> iso_root/limine.conf
         
         cp iso_root/limine.conf iso_root/boot/limine.conf
         cp iso_root/limine.conf iso_root/limine/limine.conf
 
+        # Gera a ISO Híbrida
         xorriso -as mkisofs -iso-level 3 \
           -b limine-bios-cd.bin \
           -no-emul-boot -boot-load-size 4 -boot-info-table \
@@ -103,6 +110,9 @@ jobs:
           iso_root -o Carlinho-Linux.iso
 
         ./limine/limine bios-install Carlinho-Linux.iso
+
+        echo "ISO gerada com sucesso!"
+        ls -lh Carlinho-Linux.iso
 
     - name: Disponibilizar ISO para Download
       uses: actions/upload-artifact@v4
