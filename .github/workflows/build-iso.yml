@@ -21,77 +21,84 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y build-essential bc bison flex libssl-dev libelf-dev xorriso mtools cpio git wget
 
-    - name: Baixar e Compilar Kernel Linux (x86_64)
+    - name: Baixar e Compilar Kernel Linux
       run: |
         set -e
         KERNEL_VERSION="6.6.21"
-        echo "Baixando o Kernel $KERNEL_VERSION..."
         wget -q https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VERSION}.tar.xz
         tar -xf linux-${KERNEL_VERSION}.tar.xz
         cd linux-${KERNEL_VERSION}
         
-        cp ../config/kernel.config .config
-        make olddefconfig
-        echo "Compilando o Kernel (isso pode levar alguns minutos)..."
+        make defconfig
         make -j$(nproc) bzImage
         
         mkdir -p ../build
         cp arch/x86/boot/bzImage ../build/vmlinuz
-        echo "Kernel compilado com sucesso:"
-        ls -lh ../build/vmlinuz
 
-    - name: Montar RootFS
+    - name: Criar RootFS com BusyBox (Inline)
       run: |
         set -e
-        chmod +x scripts/*.sh
-        ./scripts/build_rootfs.sh
+        mkdir -p build/rootfs/{bin,sbin,dev,proc,sys,etc,mnt,root}
+        
+        # Cria a pasta de papéis de parede dentro da ISO
+        mkdir -p build/rootfs/usr/share/backgrounds/
+        
+        # Copia o seu wallpaper localizado em assets/
+        cp assets/wallpaper.jpg build/rootfs/usr/share/backgrounds/wallpaper.jpg
+        
+        # Baixa o BusyBox estático pré-compilado
+        wget -q https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox -O build/rootfs/bin/busybox
+        chmod +x build/rootfs/bin/busybox
+        
+        # Cria os atalhos dos comandos Linux
+        cd build/rootfs/bin
+        for tool in $(./busybox --list); do
+          ln -s busybox $tool 2>/dev/null || true
+        done
+        cd ../../..
+
+        # Cria o script de inicialização do sistema (/init)
+        cat << 'EOF' > build/rootfs/init
+#!/bin/sh
+mount -t proc none /proc
+mount -t sysfs none /sys
+clear
+echo "========================================"
+echo "   BEM-VINDO AO CARLINHO-LINUX (v1.0)   "
+echo "========================================"
+exec /bin/sh
+EOF
+        chmod +x build/rootfs/init
 
     - name: Compactar Initramfs
       run: |
         set -e
         cd build/rootfs
-        echo "Compactando o sistema de arquivos"
         find . -print0 | cpio --null -ov --format=newc | gzip -9 > ../initramfs.img
         cd ../..
-        echo "Initramfs gerado com sucesso:"
-        ls -lh build/initramfs.img
 
-    - name: Gerar Imagem ISO com Limine
+    - name: Gerar ISO Híbrida com Limine
       run: |
         set -e
         git clone https://github.com/limine-bootloader/limine.git --branch=v7.x-binary --depth=1
         make -C limine
         
-        # Limpa e cria a estrutura do zero
         rm -rf iso_root
         mkdir -p iso_root/boot iso_root/limine
         
-        # Copia o Kernel e o Initramfs
         cp build/vmlinuz iso_root/boot/vmlinuz
         cp build/initramfs.img iso_root/boot/initramfs.img
-        
-        # Copia os binários do Limine
         cp limine/limine-bios.sys limine/limine-bios-cd.bin limine/limine-uefi-cd.bin iso_root/
         
-        # Cria o limine.conf diretamente usando eco seguro (evita problemas de quebra de linha)
         echo "timeout: 3" > iso_root/limine.conf
         echo "/Carlinho-Linux (64-bit)" >> iso_root/limine.conf
         echo "    protocol: linux" >> iso_root/limine.conf
         echo "    kernel_path: boot:///boot/vmlinuz" >> iso_root/limine.conf
         echo "    initrd_path: boot:///boot/initramfs.img" >> iso_root/limine.conf
         
-        # Duplica para as pastas secundárias por segurança
         cp iso_root/limine.conf iso_root/boot/limine.conf
         cp iso_root/limine.conf iso_root/limine/limine.conf
 
-        # Mostra o conteúdo exato na tela do log para confirmarmos
-        echo "=== CONTEÚDO DO LIMINE.CONF ==="
-        cat iso_root/limine.conf
-        
-        echo "=== ARQUIVOS NA RAIZ DA ISO_ROOT ==="
-        ls -la iso_root/
-
-        # Gera a ISO Híbrida incluindo extensões Rock Ridge / Joliet para compatibilidade máxima de arquivos
         xorriso -as mkisofs -iso-level 3 \
           -b limine-bios-cd.bin \
           -no-emul-boot -boot-load-size 4 -boot-info-table \
@@ -100,9 +107,6 @@ jobs:
           iso_root -o Carlinho-Linux.iso
 
         ./limine/limine bios-install Carlinho-Linux.iso
-        
-        echo "ISO gerada com sucesso!"
-        ls -lh Carlinho-Linux.iso
 
     - name: Disponibilizar ISO para Download
       uses: actions/upload-artifact@v4
